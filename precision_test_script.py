@@ -30,6 +30,10 @@ def main():
                         help='Image(s) to analyze')
     parser.add_argument('-n', '--series-name', dest='series_name', metavar='NAME',
                         default='default_series', help='Series/experiment identifier')
+    parser.add_argument('-d', '--downsample-depth', dest='downsample_depth', type=int,
+                        default=1, help='Downsample depth (to avoid poor conditioning, or speed up)')
+    parser.add_argument('-D', '--downsample-image', dest='downsample_image', type=int,
+                        default=1, help='Downsample image (to speed up solution or reduce memory consumption)')
     parser.add_argument('-g', '--visualize', dest='visualize',
                         action="store_true", default=False,
                         help='Show interactive plots')
@@ -43,6 +47,7 @@ def main():
     series_name = options.series_name
     image_filepaths = options.image_filepaths
     formulation = l1_formulation_cvxopt()
+    ds_pixel, ds_depth = options.downsample_image, options.downsample_depth
     if options.verbose:
         loglevel = logging.DEBUG
     else:
@@ -66,13 +71,13 @@ def main():
 
     # Load PSF template
     logger.debug('Loading template')
-    psf_template = load_psf_template()
+    psf_template = downsample_array(load_psf_template(), (ds_pixel, ds_pixel, ds_depth))
     r,p,q = psf_template.shape
-    depth_range = arange(1, r+1) # in units of delta_depth
+    depth_range = arange(1, r+1) # in units of delta_depth*ds_depth
     logger.debug('Done')
 
     logger.debug('Setting template')
-    formulation.set_psf_template(downsample_array(psf_template, (2, 2, 2)))
+    formulation.set_psf_template(psf_template)
     logger.debug('Done')
 
     # Loop over images given on command line
@@ -95,11 +100,11 @@ def main():
 
         for i in xrange(images.shape[0]):
             logger.debug('On slice: {}'.format(i))
-            image = images[i, :, :]
+            image = downsample_array(images[i, :, :], (ds_pixel, ds_pixel))
             n,m = image.shape
 
             logger.debug('Setting current image')
-            formulation.set_image(downsample_array(image,(2,2)))
+            formulation.set_image(image)
             logger.debug('Done')
 
             # Initialize results dict entry
