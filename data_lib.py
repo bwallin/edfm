@@ -6,7 +6,7 @@ Author: Bruce Wallin
 from __future__ import division
 import logging
 
-from numpy import zeros, eye, dot, ones
+from numpy import zeros, eye, dot, ones, swapaxes
 import cvxopt
 import cvxopt.solvers
 import tifffile
@@ -17,6 +17,9 @@ psf_template_filepath = '/home/bwallin/ws/edf_micro/data/Intensity_PSF_template_
 
 def load_psf_template(psf_template_filepath=psf_template_filepath):
     psf_template_tensor = tifffile.imread(psf_template_filepath).astype('float')
+    # Now roll first axis to last so in x,y,z order
+    psf_template_tensor = swapaxes(psf_template_tensor, 0, 1)
+    psf_template_tensor = swapaxes(psf_template_tensor, 1, 2)
 
     return psf_template_tensor
 
@@ -37,17 +40,13 @@ def downsample_array(a, ds):
     return a_downsampled
 
 
-def clip_by_union(imageA, imageB, centerA=None, centerB=None):
+def clip_by_union(image_to_clip, second_image):
     '''
     Aligns given center pixels of each image and crops both to their logical
     union.
     '''
-    n,m = imageA.shape
-    p,q = imageB.shape
-    if centerA is None:
-        centerA = (int(n/2), int(m/2))
-    if centerB is None:
-        centerB = (int(p/2), int(q/2))
+    n,m = image_to_clip.shape
+    p,q = clipper_image.shape[:2]
 
     diffAB = centerA - centerB
     sumAB = centerA + centerB
@@ -80,9 +79,9 @@ def clip_by_union(imageA, imageB, centerA=None, centerB=None):
     B_sl_h = slice(left_clip_B, right_clip_B)
     B_sl_v = slice(bottom_clip_B, top_clip_B)
 
-    imageA_clipped = [A_sl_h, A_sl_v]
+    image_to_clip_clipped = [A_sl_h, A_sl_v]
     imageB_clipped = [B_sl_h, B_sl_v]
 
-    return imageA_clipped, imageB_clipped
+    return image_to_clip_clipped, imageB_clipped
 
 
