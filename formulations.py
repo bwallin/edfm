@@ -35,10 +35,10 @@ class lsq_formulation_cvxopt():
         '''
         Read 3D array of discretized PSF images and generate A and Q.
         '''
-        r,p,q = psf_template_tensor.shape
+        p,q,r = psf_template_tensor.shape
         A = zeros([p*q, r+1]) # +1 is for constant/intercept term
         for i in xrange(r):
-            A[:,i] = psf_template_tensor[i,:,:].ravel()
+            A[:,i] = psf_template_tensor[:,:,i].ravel()
         A[:, -1] = ones(p*q) # This last column is for the constant/intercept term
 
         self.A = A
@@ -57,7 +57,6 @@ class lsq_formulation_cvxopt():
         '''
         Solves minimization problem using quadratic program formulation.
         '''
-        pdb.set_trace()
         A, y, Q = self.A, self.y, self.Q
         n, n = Q.size
         p = cvxopt.matrix(-2*dot(A.transpose(), y))
@@ -112,7 +111,6 @@ class lsq_formulation_mosek():
         '''
         Solves minimization problem using quadratic program formulation.
         '''
-        pdb.set_trace()
         A, y, Q = self.A, self.y, self.Q
         n, n = Q.shape
         p = cvxopt.matrix(-2*dot(A.transpose(), y))
@@ -141,14 +139,20 @@ class l1_formulation_cvxopt():
     min l1norm(Ax - y)
     s.t.       x >= 0
     '''
+    def __init__(self):
+        self.A = None
+        self.y = None
+        self.c = None
+
+
     def set_psf_template(self, psf_template_tensor):
         '''
         Read 3D array of discretized PSF images and generate A.
         '''
-        r,p,q = psf_template_tensor.shape
+        p,q,r = psf_template_tensor.shape
         A = zeros([p*q, r+1]) # +1 for constant/intercept term
         for i in xrange(r):
-            A[:,i] = psf_template_tensor[i,:,:].ravel()
+            A[:,i] = psf_template_tensor[:,:,i].ravel()
         A[:, -1] = ones(p*q) # This last column is for the constant/intercept term
 
         A = cvxopt.sparse(cvxopt.matrix(A))
@@ -159,7 +163,12 @@ class l1_formulation_cvxopt():
             [A, -A, -I_r],
             [-I_pq, -I_pq, Z]
             ]) # Sparse block matrix in COLUMN major order...for some reason
+        c = vstack([
+            zeros((r+1, 1)),
+            ones((p*q, 1))
+            ])
 
+        self.c = cvxopt.matrix(c)
         self.A = A
 
 
@@ -168,16 +177,20 @@ class l1_formulation_cvxopt():
         Take image and flatten into y.
         '''
         y = image.ravel()
-        self.y = vstack([y, -y])
+        self.y = y
 
 
     def solve(self):
         '''
         Solves minimization problem using epigraph linear program formulation.
         '''
-        A, y = self.A, cvxopt.sparse(cvxopt.matrix(self.y))
-        n, r = A.size
-        c = cvxopt.matrix(vstack([zeros((r,1)),ones((n,1))]))
+        A, y, c = self.A, self.y, self.c
+        N,M = A.size
+        n = len(y)
+        y = cvxopt.matrix(vstack([
+            y.reshape((n,1)),
+            -y.reshape((n,1)),
+            zeros((N-2*n,1))]))
         result = cvxopt.solvers.lp(c, A, y)
 
         return result['x']
