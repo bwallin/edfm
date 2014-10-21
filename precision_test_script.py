@@ -19,7 +19,7 @@ from pylab import (pcolormesh, subplots, show, zeros, arange, dot, array, xlim,
 from matplotlib.colors import LogNorm
 from progressbar import ProgressBar
 
-from formulations import lsq_formulation_cvxopt, l1_formulation_cvxopt
+from formulations import single_loc_lsq_cvxopt
 from data_lib import load_psf_template, load_image, clip_by_union, downsample_array
 
 
@@ -46,7 +46,7 @@ def main():
     options = parser.parse_args()
     series_name = options.series_name
     image_filepaths = options.image_filepaths
-    formulation = l1_formulation_cvxopt()
+    formulation = single_loc_lsq_cvxopt()
     ds_pixel, ds_depth = options.downsample_image, options.downsample_depth
     if options.verbose:
         loglevel = logging.DEBUG
