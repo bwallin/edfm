@@ -40,48 +40,39 @@ def downsample_array(a, ds):
     return a_downsampled
 
 
-def clip_by_union(image_to_clip, second_image):
+def crop_array_union(arrayA, arrayB, location):
     '''
-    Aligns given center pixels of each image and crops both to their logical
-    union.
+    Crops first two dimensions of \'array_to_crop\' to fit in shape of \'cropper_array\'
+    when aligned at \'location\'.
     '''
-    n,m = image_to_clip.shape
-    p,q = clipper_image.shape[:2]
+    i,j = location
+    n,m = arrayA.shape[:2]
+    p,q = arrayB.shape[:2]
+    assert i > -p
+    assert i < n+p
+    assert j > -q
+    assert j < m+q
 
-    diffAB = centerA - centerB
-    sumAB = centerA + centerB
+    left_cropA = max(i, 0)
+    right_cropA = min(i+p, n)
+    bottom_cropA = max(j, 0)
+    top_cropA = min(j+q, m)
 
-    left_clip_A, left_clip_B = None, None
-    right_clip_A, right_clip_B = None, None
-    if diffAB[0] >= 0:
-        left_clip_A = diffAB[0]
-    else:
-        left_clip_B = abs(diffAB[0])
-    if sumAB[0] >= n:
-        right_clip_B = p-sumAB[0]+n
-    else:
-        right_clip_A = sumAB[0]
+    A_sl_h = slice(left_cropA, right_cropA)
+    A_sl_v = slice(bottom_cropA, top_cropA)
 
-    top_clip_A, top_clip_B = None, None
-    bottom_clip_A, bottom_clip_B = None, None
-    if diffAB[1] >= 0:
-        top_clip_A = diffAB[1]
-    else:
-        top_clip_B = abs(diffAB[1])
-    if sumAB[1] >= m:
-        bottom_clip_B = p-sumAB[1]+m
-    else:
-        bottom_clip_A = sumAB[1]
+    left_cropB = max(-i, 0)
+    right_cropB = min(n-i, p)
+    bottom_cropB = max(-j, 0)
+    top_cropB = min(m-j, q)
 
-    A_sl_h = slice(left_clip_A, right_clip_A)
-    A_sl_v = slice(bottom_clip_A, bottom_clip_A)
+    B_sl_h = slice(left_cropB, right_cropB)
+    B_sl_v = slice(bottom_cropB, top_cropB)
 
-    B_sl_h = slice(left_clip_B, right_clip_B)
-    B_sl_v = slice(bottom_clip_B, top_clip_B)
 
-    image_to_clip_clipped = [A_sl_h, A_sl_v]
-    imageB_clipped = [B_sl_h, B_sl_v]
+    arrayA_cropped = arrayA[A_sl_h, A_sl_v]
+    arrayB_cropped = arrayB[B_sl_h, B_sl_v]
 
-    return image_to_clip_clipped, imageB_clipped
+    return arrayA_cropped, arrayB_cropped
 
 
