@@ -19,7 +19,7 @@ from pylab import (pcolormesh, subplots, show, zeros, arange, dot, array, xlim,
 from matplotlib.colors import LogNorm
 from progressbar import ProgressBar
 
-from formulations import single_loc_lsq_cvxopt
+from inversion_formulations import single_loc_lsq_cvxopt, single_loc_lsql1reg_cvxopt
 from data_lib import load_psf_template, load_image, downsample_array
 
 
@@ -36,7 +36,7 @@ def main():
     options = parser.parse_args()
     series_name = options.series_name
     image_filepath = options.image_filepath
-    formulation = single_loc_lsq_cvxopt()
+    formulation = single_loc_lsql1reg_cvxopt()
     if options.verbose:
         loglevel = logging.DEBUG
     else:
@@ -82,9 +82,10 @@ def main():
     # Initialize depth array
     X = zeros((n-p, m-q, r))
 
-    progress = ProgressBar()
-    for i in progress(range(n-p)):
-        for j in xrange(m-q):
+    #for i in xrange(n-p):
+    #    for j in xrange(m-q):
+    for i in [2]:
+        for j in [22]:
             logger.debug('Setting current image')
             formulation.set_image(image[i:i+p, j:j+q])
             logger.debug('Done')
@@ -93,6 +94,7 @@ def main():
             start_time = time.time()
             x = formulation.solve()
             X[i,j,:] = array(x[:r]).ravel()
+            pdb.set_trace()
             solve_times = start_time - time.time()
             logger.debug('Done')
 
