@@ -127,11 +127,11 @@ class single_loc_lsql1reg_cvxopt():
         pq = y.size
         r = n-pq
         p = sparse([matrix(-2*dot(A.transpose(), y)), matrix(ones((pq,1)))])
-        I_x = spdiag(ones((r, 1)))
-        I_t = spdiag(ones((pq, 1)))
-        Z_t = spdiag(0*ones((pq, 1)))
-        G = sparse([[I_r, -I_r, -I_r], [-I_t, -I_t, Z]])
-        z_xt = 0*ones((pq+r, 1))
+        I_x = spdiag(matrix(ones((r, 1))))
+        I_t = spdiag(matrix(ones((pq, 1))))
+        Z_t = spdiag(matrix(0*ones((pq, 1))))
+        G = sparse([[I_x, -I_x, -I_x], [-I_t, -I_t, Z_t]])
+        z_xt = matrix(0*ones((pq+r, 1)))
         h = sparse([z_xt, z_xt, z_xt])
         result = solvers.qp(Q, p, G, h)
 
