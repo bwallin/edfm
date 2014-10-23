@@ -30,12 +30,15 @@ def main():
                         help='Image to analyze')
     parser.add_argument('-n', '--series-name', dest='series_name', metavar='NAME',
                         default='default_series', help='Series/experiment identifier')
+    parser.add_argument('-a', '--alpha', dest='alpha', metavar='FLOAT', type=float,
+                        default=0, help='Regularization parameter')
     parser.add_argument('-v', '--verbose', dest='verbose',
                         action="store_true", default=False,
                         help='Verbose mode')
     options = parser.parse_args()
     series_name = options.series_name
     image_filepath = options.image_filepath
+    alpha = options.alpha
     formulation = single_loc_lsql1reg_cvxopt()
     if options.verbose:
         loglevel = logging.DEBUG
@@ -67,6 +70,10 @@ def main():
 
     logger.debug('Setting template')
     formulation.set_psf_template(psf_template)
+    logger.debug('Done')
+
+    logger.debug('Setting alpha to {}'.format(alpha))
+    formulation.set_alpha(alpha)
     logger.debug('Done')
 
     # Data name is meaningful part of filename

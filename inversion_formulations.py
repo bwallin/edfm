@@ -9,6 +9,7 @@ import logging
 import pdb
 
 from numpy import zeros, eye, dot, ones, vstack
+from numpy.linalg import norm
 import cvxopt
 import cvxopt.solvers
 from cvxopt import solvers, sparse, matrix, spdiag, spmatrix
@@ -24,6 +25,7 @@ class single_loc_lsq_cvxopt():
     def __init__(self):
         self.A = None
         self.y = None
+        self.normalization_factor = None
 
         # cvxopt ready arrays
         self.Q = None
@@ -60,10 +62,7 @@ class single_loc_lsq_cvxopt():
         '''
         A, y, Q = self.A, self.y, self.Q
         n, n = Q.size
-        try:
-            p = matrix(-2*dot(A.transpose(), y))
-        except:
-            pdb.set_trace()
+        p = matrix(-2*dot(A.transpose(), y))
         G = matrix(-eye(n))
         h = matrix(zeros((n,1)))
         result = solvers.qp(Q, p, G, h)
@@ -75,12 +74,13 @@ class single_loc_lsql1reg_cvxopt():
     '''
     Formulation of minimization problem:
     min norm(Ax-y,2)^2 + alpha*norm(x, 1)
-    s.t.      x >= 0
+    s.t. x >= 0
     '''
     def __init__(self):
         self.A = None
         self.y = None
         self.alpha = None
+        self.normalization_factor = None
 
         # cvxopt ready arrays
         self.Q = None
@@ -98,20 +98,20 @@ class single_loc_lsql1reg_cvxopt():
         for i in xrange(r):
             A[:,i] = psf_template_tensor[:,:,i].ravel()
         A[:, -1] = ones(p*q) # This last column is for the constant/intercept term
+        self.normalization_factor = 1/norm(A)
 
         self.A = A
         Q = matrix(2*dot(A.transpose(), A))
-        Z_1 = spmatrix([], [], [], (p*q, r+1))
-        Z_2 = spmatrix([], [], [], (r+1, p*q))
-        Z_3 = spmatrix([], [], [], (p*q, p*q))
-        self.Q = sparse([[Q, Z_1],[Z_2, Z_3]])
+        Z = spmatrix([], [], [], (r+1, r+1))
+        self.Q = sparse([[Q, Z],[Z, Z]])
 
 
     def set_image(self, image):
         '''
         Take image and flatten into y.
         '''
-        self.y = image.ravel()
+        n, m = image.shape
+        self.y = self.normalization_factor*image.ravel().reshape([n*m, 1])
 
 
     def set_alpha(self, alpha):
@@ -124,15 +124,13 @@ class single_loc_lsql1reg_cvxopt():
         '''
         A, y, Q = self.A, self.y, self.Q
         n, n = Q.size
-        pq = y.size
-        r = n-pq
-        p = sparse([matrix(-2*dot(A.transpose(), y)), matrix(ones((pq,1)))])
-        I_x = spdiag(matrix(ones((r, 1))))
-        I_t = spdiag(matrix(ones((pq, 1))))
-        Z_t = spdiag(matrix(0*ones((pq, 1))))
-        G = sparse([[I_x, -I_x, -I_x], [-I_t, -I_t, Z_t]])
-        z_xt = matrix(0*ones((pq+r, 1)))
-        h = sparse([z_xt, z_xt, z_xt])
+        r = n/2-1
+        p = matrix([matrix(-2*dot(A.transpose(), y)), matrix(self.alpha*ones((r+1,1)))])
+        I = spdiag(matrix(ones((r+1, 1))))
+        Z = spdiag(matrix(0*ones((r+1, 1))))
+        G = sparse([[I, -I, -I], [-I, -I, Z]])
+        z = matrix(0*ones((r+1, 1)))
+        h = matrix([z, z, z])
         result = solvers.qp(Q, p, G, h)
 
         return result['x']
