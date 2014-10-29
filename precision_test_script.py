@@ -19,8 +19,9 @@ from pylab import (pcolormesh, subplots, show, zeros, arange, dot, array, xlim,
 from matplotlib.colors import LogNorm
 from progressbar import ProgressBar
 
-from formulations import single_loc_lsq_cvxopt
-from data_lib import load_psf_template, load_image, clip_by_union, downsample_array
+from dpsf import DiscretizedPSF
+from inversion_formulations import single_loc_lsq_cvxopt, single_loc_l1_cvxopt
+from data_lib import load_psf_template, load_image, downsample_array
 
 
 def main():
@@ -30,10 +31,17 @@ def main():
                         help='Image(s) to analyze')
     parser.add_argument('-n', '--series-name', dest='series_name', metavar='NAME',
                         default='default_series', help='Series/experiment identifier')
+    parser.add_argument('-o', '--objective-norm', dest='objective_norm', metavar='NAME',
+                        default='l2', help='Objective norm on errors to use (l1, l2)')
     parser.add_argument('-d', '--downsample-depth', dest='downsample_depth', type=int,
-                        default=1, help='Downsample depth (to avoid poor conditioning, or speed up)')
+                        default=1,
+                        help='Downsample depth (to avoid poor conditioning, or speed up)')
     parser.add_argument('-D', '--downsample-image', dest='downsample_image', type=int,
-                        default=1, help='Downsample image (to speed up solution or reduce memory consumption)')
+                        default=1,
+                        help='Downsample image (to speed up solution or reduce memory consumption)')
+    parser.add_argument('-c', '--cross-section', dest='cross_section',
+                        default=False, action='store_true',
+                        help='Subset image and PSF for efficiency (i.e. cross-section, border-crop)')
     parser.add_argument('-g', '--visualize', dest='visualize',
                         action="store_true", default=False,
                         help='Show interactive plots')
@@ -46,8 +54,12 @@ def main():
     options = parser.parse_args()
     series_name = options.series_name
     image_filepaths = options.image_filepaths
-    formulation = single_loc_lsq_cvxopt()
+    if options.objective_norm == 'l2':
+        formulation = single_loc_lsq_cvxopt()
+    elif options.objective_norm == 'l1':
+        formulation = single_loc_l1_cvxopt()
     ds_pixel, ds_depth = options.downsample_image, options.downsample_depth
+    cross_section = options.cross_section
     if options.verbose:
         loglevel = logging.DEBUG
     else:
@@ -71,13 +83,16 @@ def main():
 
     # Load PSF template
     logger.debug('Loading template')
-    psf_template = downsample_array(load_psf_template(), (ds_pixel, ds_pixel, ds_depth))
+    psf_template = DiscretizedPSF(depth_resolution=1, depth_unit='?')
+    psf_template.load_from_tiff(psf_tiff_path)
     r,p,q = psf_template.shape
-    depth_range = arange(1, r+1) # in units of delta_depth*ds_depth
+    depth_range = arange(1, r+1)*psf_template.depth_resolution
+    logger.debug('Shape: {}'.format(psf_template.shape))
     logger.debug('Done')
 
     logger.debug('Setting template')
     formulation.set_psf_template(psf_template)
+    logger.debug('Shape: {}'.format(psf_template.shape))
     logger.debug('Done')
 
     # Loop over images given on command line
@@ -86,25 +101,29 @@ def main():
         # Data name is meaningful part of filename
         data_name = os.path.splitext(os.path.split(image_filepath)[-1])[0]
 
-        # Extract parameters from data name
-        true_depth, true_photons, true_G = [float(el) for el in
-                re.search('depth([0-9]*)_p([0-9]*e[0-9]*)_G([0-9]*)', data_name).groups()]
-
         # Initialize results dict
         results[data_name] = []
 
         # Load multipage tiff
         logger.debug('Loading image: {}'.format(data_name))
         images = load_image(image_filepath)
+        logger.debug('Shape: {}'.format(images.shape))
         logger.debug('Done')
 
         for i in xrange(images.shape[0]):
             logger.debug('On slice: {}'.format(i))
-            image = downsample_array(images[i, :, :], (ds_pixel, ds_pixel))
+            if ds_pixel > 1:
+                image = downsample_array(images[i, :, :], (ds_pixel, ds_pixel))
+            else:
+                image = images[i, :, :]
             n,m = image.shape
 
             logger.debug('Setting current image')
+            if cross_section:
+                image = image[:,m/2:m/2+2]
+                n,m = image.shape
             formulation.set_image(image)
+            logger.debug('Shape: {}'.format(image.shape))
             logger.debug('Done')
 
             # Initialize results dict entry
@@ -112,40 +131,13 @@ def main():
 
             logger.debug('Solving')
             start_time = time.time()
-            x = formulation.solve()
-            solve_time = start_time - time.time()
+            status = formulation.solve()
+            solve_time = time.time() - start_time
             logger.debug('Done')
 
-            # Compute estimated point source depth, and store results
-            depth_mode = array(x)[:r].argmax() + 1
-            results[data_name][i]['depth_abserror'] = abs(true_depth - depth_mode)
-            results[data_name][i]['x'] = array(x)
+            # Store results
+            results[data_name][i]['result'] = formulation.result
             results[data_name][i]['solve_time'] = solve_time
-            logger.debug('Depth error: {}'.format(results[data_name][i]['depth_abserror']))
-
-            # Optionally make solution plot
-            if options.visualize or options.save_plots:
-                fig, ax1 = subplots(1, 1)
-                ax1.plot(depth_range, x[:r], '-')
-                ax1.vlines(true_depth, 0, max(x), 'g')
-                ax1.set_xlim((min(depth_range), max(depth_range)))
-                ax1.set_ylim((0, max(x)))
-                ax1.set_xlabel('depth')
-                ax1.set_ylabel('coefficient')
-                ax1.set_title('Solution to constrained least squares: {} #{}'.format(data_name, i))
-                plot_dir = os.path.join('.', 'plots', series_name)
-                if not os.path.exists(plot_dir):
-                    os.makedirs(plot_dir)
-                if options.visualize:
-                    logger.debug('Showing plot')
-                    show()
-                    logger.debug('Done')
-                if options.save_plots:
-                    plot_filename = os.path.join(plot_dir, data_name+'_'+str(i)+'.png')
-                    logger.debug('Saving plot to {}'.format(plot_filename))
-                    savefig(plot_filename)
-                    logger.debug('Done')
-                close(fig)
 
     cPickle.dump(results, open(series_name+'.pkl', 'wb'))
 

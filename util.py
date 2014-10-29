@@ -17,9 +17,6 @@ psf_template_filepath = '/home/bwallin/ws/edf_micro/data/Intensity_PSF_template_
 
 def load_psf_template(psf_template_filepath=psf_template_filepath):
     psf_template_tensor = tifffile.imread(psf_template_filepath).astype('float')
-    # Now roll first axis to last so in x,y,z order
-    psf_template_tensor = swapaxes(psf_template_tensor, 0, 1)
-    psf_template_tensor = swapaxes(psf_template_tensor, 1, 2)
 
     return psf_template_tensor
 
