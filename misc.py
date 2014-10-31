@@ -66,7 +66,6 @@ def crop_array_union(arrayA, arrayB, location):
     B_sl_h = slice(left_cropB, right_cropB)
     B_sl_v = slice(bottom_cropB, top_cropB)
 
-
     arrayA_cropped = arrayA[A_sl_h, A_sl_v]
     arrayB_cropped = arrayB[B_sl_h, B_sl_v]
 

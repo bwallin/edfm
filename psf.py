@@ -31,8 +31,7 @@ numpy array.
 >>>     [[1,1,1],[1,0,1],[1,1,1]]]))
 
 '''
-import pdb
-
+from scipy import zeros
 import scipy.sparse
 import tifffile
 
@@ -132,6 +131,8 @@ class DiscretizedPSF(object):
             and j,k the x,y pixel indices, and non-zero pixel value
             at that index.
 
+        Notes
+        -----
         '''
         psf_dok = {}
         for i in xrange(self.__len__()):
@@ -141,29 +142,3 @@ class DiscretizedPSF(object):
                 psf_dok[indices] = value
 
         return psf_dok
-
-
-class MaskedPSF(DiscretizedPSF):
-    '''This class represents a discretized point-spread-function (PSF)
-    sampled on a regular grid with a 2D mask applied (to subsample).
-
-    Parameters
-    ----------
-    template: scipy.sparse.dok_matrix
-        3 dimensional dok_matrix of numeric data type representing PSF
-            evaluated at discrete locations
-    resolutions: (float, float, float) or None
-        Ordered list of step sizes (dx, dy, dz)
-    units: (str, str, str) or None
-        Ordered list of units for (x, y, z)
-
-    '''
-    def __init__(self, mask=None, *args, **kwargs):
-        super(MaskedPSF, self).__init__(*args, **kwargs)
-        self.set_mask(mask)
-
-    def set_mask(self, mask):
-        self.mask = mask
-
-    def flatten(self):
-        pass

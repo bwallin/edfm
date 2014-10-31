@@ -1,0 +1,3 @@
+  * Make package with setuptools
+  * Documentation (sphinx)
+  * Add PSF arbitrary masking capability

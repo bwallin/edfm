@@ -1,0 +1,17 @@
+==============
+EDF Microscopy
+==============
+
+Prototype code for an extended depth-of-field microscopy project under PI's Carol Cogswell and Ute Herzfeld.
+
+Initiated: 9/2014
+
+
+Contents
+--------
+
+psf.py - This is a module to handle point-spread-functions, which characterize the impulse response of the microscope optics.
+inversion.py - Solution code for solving the problem of inverting for depth given an image.
+precision_test_script.py - Script for experiment testing robustness of single flourescent dot source depth inversion under various conditions.
+naive_localization_test_script.py - Script implementing simple flourescent dot localization idea.
+flourdots_simulation.py - Basic simulation script for simple flourescent dot images generation.
