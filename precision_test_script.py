@@ -11,32 +11,38 @@ import cPickle
 import time
 
 from psf import DiscretizedPSF
-from inversion import LeastSquares
+from inversion import LeastSquaresCVXOPT
 from misc import downsample_array, load_image
 
-psf_tiff_filepath = '/home/bwallin/ws/edf_micro/data/Intensity_PSF_template_CirCau_NA003.tif'
+psf_tiff_dir = '/home/bwallin/ws/edf_micro/data/'
+psf_tiff_filename = 'Intensity_PSF_template_CirCau_NA003.tif'
+psf_tiff_filepath = os.path.join(psf_tiff_dir, psf_tiff_filename)
 
 
 def main():
     # Options and arguments
-    parser = ArgumentParser(description='Perform depth inversion of EDF point source.')
+    parser = ArgumentParser(
+        description='Perform depth inversion of EDF point source.')
     parser.add_argument('image_filepaths', metavar='filename(s)', nargs='+',
                         help='Image(s) to analyze')
-    parser.add_argument('-n', '--series-name', dest='series_name', metavar='NAME',
-                        default='default_series', help='Series/experiment identifier')
-    parser.add_argument('-o', '--objective-norm', dest='objective_norm', metavar='NAME',
-                        default='l2', help='Objective norm on errors to use (l1, l2)')
-    parser.add_argument('-D', '--downsample-image', dest='downsample_image', type=int,
-                        default=1,
-                        help='Downsample image (to speed up solution or reduce memory consumption)')
-    parser.add_argument('-c', '--cross-section', dest='cross_section',
-                        default=False, action='store_true',
-                        help='Subset image and PSF for efficiency (i.e. cross-section, border-crop)')
-    parser.add_argument('-g', '--visualize', dest='visualize',
-                        action="store_true", default=False,
+    parser.add_argument('-n', '--series-name',
+                        dest='series_name', metavar='NAME',
+                        default='default_series',
+                        help='Series/experiment identifier')
+    parser.add_argument('-D', '--downsample-image',
+                        dest='downsample_image', type=int, default=1,
+                        help='Downsample image (to speed up solution or \
+                        reduce memory consumption)')
+    parser.add_argument('-c', '--cross-section',
+                        dest='cross_section', default=False,
+                        action='store_true',
+                        help='Subset image and PSF for efficiency \
+                        (i.e. cross-section, border-crop)')
+    parser.add_argument('-g', '--visualize',
+                        dest='visualize', action="store_true", default=False,
                         help='Show interactive plots')
-    parser.add_argument('-p', '--save-plots', dest='save_plots',
-                        action="store_true", default=False,
+    parser.add_argument('-p', '--save-plots',
+                        dest='save_plots', action="store_true", default=False,
                         help='Save plots to series name directory')
     parser.add_argument('-v', '--verbose', dest='verbose',
                         action="store_true", default=False,
@@ -44,10 +50,7 @@ def main():
     options = parser.parse_args()
     series_name = options.series_name
     image_filepaths = options.image_filepaths
-    if options.objective_norm == 'l2':
-        formulation = LeastSquares()
-    elif options.objective_norm == 'l1':
-        formulation = LeastSquaresL1Reg()
+    formulation = LeastSquaresCVXOPT()
     ds_pixel = options.downsample_image
     cross_section = options.cross_section
     if options.verbose:
@@ -62,7 +65,7 @@ def main():
     logger = logging.getLogger('EDF inversion - LSQ')
     logger.setLevel(loglevel)
     formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     fh = logging.FileHandler(os.path.join(log_dir, log_filename), mode='w')
     fh.setLevel(logging.DEBUG)
     fh.setFormatter(formatter)

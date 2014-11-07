@@ -61,20 +61,18 @@ class DiscretizedPSF(object):
     third axes correspond to x,y pixels. The point for which this is the
     this is the point spread function is located at the center in x,y.
     '''
-    def __init__(self, dense_array=None, depth_resolution=None,
-                 pixel_resolution=None, depth_unit=None, pixel_unit=None):
-        '''Initialize with parameters or set manually.  '''
+    def __init__(self, depth_resolution=1, pixel_resolution=1,
+            depth_unit=None, pixel_unit=None):
+        '''Initialize with parameters or set manually'''
         self._template = None
         self.shape = None
-        if dense_array is not None:
-            self.set_from_dense_array(dense_array)
         self.depth_resolution = depth_resolution
         self.pixel_resolution = pixel_resolution
         self.depth_unit = depth_unit
         self.pixel_unit = pixel_unit
 
     def __len__(self):
-        ''' Length is number of discrete depths '''
+        '''Length is number of discrete depths'''
         return len(self._template)
 
     def set_from_dense_array(self, dense_array):
@@ -101,7 +99,7 @@ class DiscretizedPSF(object):
             Path to tiff
 
         '''
-        dense_array = tifffile.imread(filepath).astype('float')
+        dense_array = tifffile.imread(filepath)
         self.set_from_dense_array(dense_array)
 
     def to_dense(self):
@@ -133,6 +131,7 @@ class DiscretizedPSF(object):
 
         Notes
         -----
+        SLOWEST THING EVER, DO NOT USE
         '''
         psf_dok = {}
         for i in xrange(self.__len__()):

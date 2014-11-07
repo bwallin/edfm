@@ -1,45 +1,45 @@
 '''
-Script testing a basic constrained least squares depth-inversion approach for EDF microscopy.
+Script testing a basic constrained least squares depth-inversion approach for
+EDF microscopy.
 
 Author: Bruce Wallin
 '''
 from __future__ import division
-import re
 import os
-from glob import glob
-import pdb
 from argparse import ArgumentParser
 import logging
 import cPickle
-import time
 
-from matplotlib import pyplot as plt
-from pylab import (pcolormesh, subplots, show, zeros, arange, dot, array, xlim,
-        ylim, eye, savefig, ones, close, vstack, hstack)
-from matplotlib.colors import LogNorm
-from progressbar import ProgressBar
+from numpy import zeros, array
 
-from inversion_formulations import single_loc_lsq_cvxopt, single_loc_lsql1reg_cvxopt
-from data_lib import load_psf_template, load_image, downsample_array
+from psf import DiscretizedPSF
+from inversion import LeastSquaresCVXOPT
+from misc import load_image
+
+
+# Generally use the same default template
+psf_tiff_dir = '/home/bwallin/ws/edf_micro/data/'
+psf_tiff_filename = 'Intensity_PSF_template_CirCau_NA003.tif'
+psf_tiff_filepath = os.path.join(psf_tiff_dir, psf_tiff_filename)
 
 
 def main():
     # Options and arguments
-    parser = ArgumentParser(description='Perform localization and depth inversion of EDF image.')
+    parser = ArgumentParser(
+        description='Perform localization and depth inversion of EDF image.')
     parser.add_argument('image_filepath', metavar='FILEPATH',
                         help='Image to analyze')
-    parser.add_argument('-n', '--series-name', dest='series_name', metavar='NAME',
-                        default='default_series', help='Series/experiment identifier')
-    parser.add_argument('-a', '--alpha', dest='alpha', metavar='FLOAT', type=float,
-                        default=0, help='Regularization parameter')
+    parser.add_argument('-n', '--series-name',
+                        dest='series_name', metavar='NAME',
+                        default='default_series',
+                        help='Series/experiment identifier')
     parser.add_argument('-v', '--verbose', dest='verbose',
                         action="store_true", default=False,
                         help='Verbose mode')
     options = parser.parse_args()
     series_name = options.series_name
     image_filepath = options.image_filepath
-    alpha = options.alpha
-    formulation = single_loc_lsql1reg_cvxopt()
+    formulation = LeastSquaresCVXOPT()
     if options.verbose:
         loglevel = logging.DEBUG
     else:
@@ -48,10 +48,11 @@ def main():
     # Set up file and console logs
     loglevel = logging.DEBUG
     log_dir = 'logs'
-    log_filename = 'depth_inversion_precision_test_{}.log'.format(series_name)
-    logger = logging.getLogger('EDF inversion - LSQ')
+    log_filename = 'naive_localization_l2minl1reg_{}.log'.format(series_name)
+    logger = logging.getLogger('EDF naive localization test')
     logger.setLevel(loglevel)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     fh = logging.FileHandler(os.path.join(log_dir, log_filename), mode='w')
     fh.setLevel(logging.DEBUG)
     fh.setFormatter(formatter)
@@ -63,50 +64,46 @@ def main():
 
     # Load PSF template
     logger.debug('Loading template')
-    psf_template = load_psf_template()
-    p,q,r = psf_template.shape
-    depth_range = arange(1, r+1) # in units of delta_depth
+    psf_template = DiscretizedPSF()
+    psf_template.load_from_tiff(psf_tiff_filepath)
+    r, p, q = psf_template.shape
     logger.debug('Done')
 
     logger.debug('Setting template')
     formulation.set_psf_template(psf_template)
     logger.debug('Done')
 
-    logger.debug('Setting alpha to {}'.format(alpha))
-    formulation.set_alpha(alpha)
-    logger.debug('Done')
-
     # Data name is meaningful part of filename
     data_name = os.path.splitext(os.path.split(image_filepath)[-1])[0]
-    results = {'data_name': data_name}
+    results = {'data_name': data_name,
+               'X': []}
 
     # Load single image tiff
     logger.debug('Loading image: {}'.format(data_name))
-    image = load_image(image_filepath)
-    n,m = image.shape
-    logger.debug('Done')
+    images = load_image(image_filepath)
+    for image in images:
+        n, m = image.shape
+        logger.debug('Done')
 
-    # Initialize depth array
-    X = zeros((n-p, m-q, r))
+        # Initialize depth array
+        X = zeros((r, n, m))
 
-    #for i in xrange(n-p):
-    #    for j in xrange(m-q):
-    for i in [2]:
-        for j in [22]:
-            logger.debug('Setting current image')
-            formulation.set_image(image[i:i+p, j:j+q])
-            logger.debug('Done')
+        for i in xrange(n):
+            for j in xrange(m):
+                logger.debug('Setting current image')
+                formulation.set_image(image)
+                logger.debug('Done')
 
-            logger.debug('Solving')
-            start_time = time.time()
-            x = formulation.solve()
-            X[i,j,:] = array(x[:r]).ravel()
-            pdb.set_trace()
-            solve_times = start_time - time.time()
-            logger.debug('Done')
+                logger.debug('Solving')
+                formulation.solve(pixel=(i, j))
+                x = formulation.x
+                X[:, i, j] = array(x[:r]).ravel()
+                logger.debug('Done')
 
-    results['X'] = X
+        results['X'].append(X)
+
     cPickle.dump(results, open(series_name+'.pkl', 'wb'))
-    pdb.set_trace()
 
-if __name__=='__main__': main()
+
+if __name__ == '__main__':
+    main()

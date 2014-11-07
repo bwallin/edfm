@@ -5,6 +5,8 @@ Author: Bruce Wallin
 '''
 from __future__ import division
 import logging
+import functools
+import collections
 
 from numpy import zeros, eye, dot, ones, swapaxes
 import cvxopt
@@ -16,7 +18,7 @@ psf_template_filepath = '/home/bwallin/ws/edf_micro/data/Intensity_PSF_template_
 
 
 def load_psf_template(psf_template_filepath=psf_template_filepath):
-    psf_template_tensor = tifffile.imread(psf_template_filepath).astype('float')
+    psf_template_tensor = tifffile.imread(psf_template_filepath)
 
     return psf_template_tensor
 
@@ -72,3 +74,28 @@ def crop_array_union(arrayA, arrayB, location):
     return arrayA_cropped, arrayB_cropped
 
 
+class memoized(object):
+   '''Decorator. Caches a function's return value each time it is called.
+   If called later with the same arguments, the cached value is returned
+   (not reevaluated).
+   '''
+   def __init__(self, func):
+      self.func = func
+      self.cache = {}
+   def __call__(self, *args):
+      if not isinstance(args, collections.Hashable):
+         # uncacheable. a list, for instance.
+         # better to not cache than blow up.
+         return self.func(*args)
+      if args in self.cache:
+         return self.cache[args]
+      else:
+         value = self.func(*args)
+         self.cache[args] = value
+         return value
+   def __repr__(self):
+      '''Return the function's docstring.'''
+      return self.func.__doc__
+   def __get__(self, obj, objtype):
+      '''Support instance methods.'''
+      return functools.partial(self.__call__, obj)
